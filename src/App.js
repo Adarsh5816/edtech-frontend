@@ -161,14 +161,14 @@ function App() {
     alert("Course created");
   };
 
-  // 🚀 LOAD AFTER LOGIN
-  useEffect(() => {
-    if (isLoggedIn) {
-      loadDashboard();
-      loadSessions();
-      loadStudents();
-    }
-  }, [isLoggedIn]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+useEffect(() => {
+  if (isLoggedIn) {
+    loadDashboard();
+    loadSessions();
+    loadStudents();
+  }
+}, [isLoggedIn]);
 
   return (
     <div style={{ padding: 30 }}>

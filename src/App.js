@@ -1,6 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
-import Calendar from "react-calendar";
-import "react-calendar/dist/Calendar.css";
+import { useState, useEffect } from "react";
 
 function App() {
   const [username, setUsername] = useState("");
@@ -9,15 +7,8 @@ function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
 
   const [sessions, setSessions] = useState([]);
-  const [students, setStudents] = useState([]);
-  const [adminStats, setAdminStats] = useState(null);
+  const [users, setUsers] = useState([]);
 
-  const [title, setTitle] = useState("");
-  const [date, setDate] = useState(new Date());
-  const [time, setTime] = useState("");
-  const [student, setStudent] = useState("");
-
-  const [course, setCourse] = useState("");
   const [newUser, setNewUser] = useState({
     username: "",
     password: "",
@@ -25,266 +16,182 @@ function App() {
   });
 
   const BASE = "https://edtech-backend-r5yc.onrender.com";
+  const token = localStorage.getItem("token");
 
-  const getToken = () => localStorage.getItem("token");
-
-  // 🔐 LOGIN
+  // LOGIN
   const login = async () => {
     const res = await fetch(`${BASE}/login`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {"Content-Type":"application/json"},
       body: JSON.stringify({ username, password })
     });
 
     const data = await res.json();
-
-    if (data.token) {
-      localStorage.setItem("token", data.token);
-      setIsLoggedIn(true);
-    } else {
-      alert("Login failed");
-    }
+    localStorage.setItem("token", data.token);
+    setIsLoggedIn(true);
   };
 
-  // 📊 LOAD ROLE
-  const loadDashboard = useCallback(async () => {
-    const res = await fetch(`${BASE}/dashboard`, {
-      headers: { Authorization: getToken() }
+  // LOAD
+  const loadData = async () => {
+    const dash = await fetch(`${BASE}/dashboard`, {
+      headers:{Authorization:token}
     });
+    const d = await dash.json();
+    setRole(d.role);
 
-    if (!res.ok) return;
-    const data = await res.json();
-    setRole(data.role);
-  }, []);
-
-  // 📚 LOAD SESSIONS
-  const loadSessions = useCallback(async () => {
-    const res = await fetch(`${BASE}/sessions`, {
-      headers: { Authorization: getToken() }
+    const s = await fetch(`${BASE}/sessions`, {
+      headers:{Authorization:token}
     });
+    setSessions(await s.json());
 
-    if (!res.ok) return;
-    const data = await res.json();
-    setSessions(data);
-  }, []);
-
-  // 👨‍🎓 LOAD STUDENTS
-  const loadStudents = useCallback(async () => {
-    const res = await fetch(`${BASE}/users`, {
-      headers: { Authorization: getToken() }
-    });
-
-    if (!res.ok) return;
-    const data = await res.json();
-    setStudents(data);
-  }, []);
-
-  // 🧑‍🏫 CREATE SESSION
-  const createSession = async () => {
-    const res = await fetch(`${BASE}/session`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: getToken()
-      },
-      body: JSON.stringify({ title, date, time, student })
-    });
-
-    const data = await res.json();
-    alert("Meet Link: " + data.meetLink);
-    loadSessions();
-  };
-
-  // 🔄 UPDATE SESSION
-  const updateSession = async (id) => {
-    await fetch(`${BASE}/session/${id}`, {
-      method: "PUT",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: getToken()
-      },
-      body: JSON.stringify({ date, time })
-    });
-
-    alert("Session updated");
-    loadSessions();
-  };
-
-  // 📊 ADMIN STATS
-  const loadAdminStats = async () => {
-    try {
-      const res = await fetch(`${BASE}/admin/stats`, {
-        headers: { Authorization: getToken() }
+    if (d.role === "admin") {
+      const u = await fetch(`${BASE}/users`, {
+        headers:{Authorization:token}
       });
-
-      if (!res.ok) {
-        const text = await res.text();
-        alert("Error: " + text);
-        return;
-      }
-
-      const data = await res.json();
-      setAdminStats(data);
-    } catch (err) {
-      console.log(err);
+      setUsers(await u.json());
     }
   };
 
-  // 👤 CREATE USER
+  useEffect(()=>{
+    if(isLoggedIn) loadData();
+  },[isLoggedIn]);
+
+  // CREATE USER
   const createUser = async () => {
-    await fetch(`${BASE}/user`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: getToken()
+    await fetch(`${BASE}/user`,{
+      method:"POST",
+      headers:{
+        "Content-Type":"application/json",
+        Authorization:token
       },
       body: JSON.stringify(newUser)
     });
-
     alert("User created");
+    loadData();
   };
 
-  // 📘 CREATE COURSE
-  const createCourse = async () => {
-    await fetch(`${BASE}/course`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: getToken()
+  // RESCHEDULE
+  const reschedule = async (id) => {
+    const time = prompt("Enter new time");
+    await fetch(`${BASE}/session/${id}`,{
+      method:"PUT",
+      headers:{
+        "Content-Type":"application/json",
+        Authorization:token
       },
-      body: JSON.stringify({ title: course })
+      body: JSON.stringify({ time })
     });
-
-    alert("Course created");
+    loadData();
   };
 
-  // 🚀 LOAD AFTER LOGIN
-  useEffect(() => {
-    if (isLoggedIn) {
-      loadDashboard();
-      loadSessions();
-      loadStudents();
-    }
-  }, [isLoggedIn, loadDashboard, loadSessions, loadStudents]);
+  const days = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday"];
 
   return (
-    <div style={{ padding: 30 }}>
-      {!isLoggedIn ? (
-        <>
-          <h2>Login</h2>
-          <input placeholder="Username" onChange={(e)=>setUsername(e.target.value)} />
-          <br /><br />
-          <input type="password" placeholder="Password" onChange={(e)=>setPassword(e.target.value)} />
-          <br /><br />
-          <button onClick={login}>Login</button>
-        </>
-      ) : role ? (
-        <>
-          <h2>{role}</h2>
+    <div className="flex h-screen">
 
-          {/* STUDENT */}
-          {role === "student" && (
-            <>
-              <Calendar onChange={setDate} value={date} />
+      {/* SIDEBAR */}
+      <div className="w-60 bg-indigo-600 text-white p-4">
+        <h2 className="text-xl font-bold mb-4">EdTech</h2>
+        <p>{role}</p>
+        <button
+          className="mt-4 bg-red-500 p-2 w-full rounded"
+          onClick={()=>{localStorage.removeItem("token");setIsLoggedIn(false)}}
+        >
+          Logout
+        </button>
+      </div>
 
-              {sessions
-                .filter(s => new Date(s.date).toDateString() === date.toDateString())
-                .map((s, i) => (
-                  <div key={i}>
-                    <b>{s.title}</b><br/>
-                    👨‍🏫 {s.tutor}<br/>
-                    ⏰ {s.time}<br/>
-                    <a href={s.meetLink} target="_blank" rel="noreferrer">
-                      👉 Join Class
-                    </a>
-                  </div>
+      {/* MAIN */}
+      <div className="flex-1 p-6 bg-gray-100 overflow-auto">
+
+        {!isLoggedIn ? (
+          <div className="bg-white p-6 w-80 mx-auto rounded shadow">
+            <h2 className="text-xl mb-4">Login</h2>
+            <input className="border p-2 w-full mb-2" placeholder="username"
+              onChange={e=>setUsername(e.target.value)} />
+            <input className="border p-2 w-full mb-2" placeholder="password"
+              onChange={e=>setPassword(e.target.value)} />
+            <button className="bg-indigo-600 text-white w-full p-2"
+              onClick={login}>
+              Login
+            </button>
+          </div>
+        ) : (
+
+          <>
+            {/* ADMIN */}
+            {role === "admin" && (
+              <div className="bg-white p-4 rounded shadow mb-4">
+                <h3>Create User</h3>
+
+                <input className="border p-2 m-1"
+                  placeholder="username"
+                  onChange={e=>setNewUser({...newUser,username:e.target.value})}
+                />
+                <input className="border p-2 m-1"
+                  placeholder="password"
+                  onChange={e=>setNewUser({...newUser,password:e.target.value})}
+                />
+
+                <select
+                  onChange={e=>setNewUser({...newUser,role:e.target.value})}
+                >
+                  <option>student</option>
+                  <option>tutor</option>
+                </select>
+
+                <button onClick={createUser}
+                  className="bg-green-500 text-white p-2 ml-2">
+                  Create
+                </button>
+
+                <h3 className="mt-4">Users</h3>
+                {users.map(u=>(
+                  <div key={u._id}>{u.username} - {u.role}</div>
                 ))}
-            </>
-          )}
+              </div>
+            )}
 
-          {/* TUTOR */}
-          {role === "tutor" && (
-            <>
-              <input placeholder="Session Title" onChange={(e)=>setTitle(e.target.value)} />
-              <br /><br />
+            {/* WEEK VIEW */}
+            {days.map(day => (
+              <div key={day} className="bg-white p-4 rounded shadow mb-4">
+                <h2 className="text-green-600 text-xl">{day}</h2>
 
-              <Calendar onChange={setDate} value={date} />
-              <br />
-
-              <input type="time" onChange={(e)=>setTime(e.target.value)} />
-              <br /><br />
-
-              <select onChange={(e)=>setStudent(e.target.value)}>
-                <option>Select student</option>
-                {students.map((s,i)=>(
-                  <option key={i} value={s.username}>{s.username}</option>
-                ))}
-              </select>
-
-              <br /><br />
-              <button onClick={createSession}>Create Session</button>
-
-              <h3>Reschedule</h3>
-              {sessions.map(s => (
-                <div key={s._id}>
-                  {s.title} - {s.time}
-                  <button onClick={()=>updateSession(s._id)}>Update</button>
+                <div className="grid grid-cols-4 font-bold mt-2">
+                  <span>Time</span>
+                  <span>Meet</span>
+                  <span>Student</span>
+                  <span>Action</span>
                 </div>
-              ))}
-            </>
-          )}
 
-          {/* ADMIN */}
-          {role === "admin" && (
-            <>
-              <h3>Create User</h3>
-              <input placeholder="username" onChange={(e)=>setNewUser({...newUser, username:e.target.value})} />
-              <input placeholder="password" onChange={(e)=>setNewUser({...newUser, password:e.target.value})} />
+                {sessions
+                  .filter(s =>
+                    new Date(s.date).toLocaleString("en-US",{weekday:"long"})===day
+                  )
+                  .map(s => (
+                    <div key={s._id}
+                      className="grid grid-cols-4 mt-2">
 
-              <select onChange={(e)=>setNewUser({...newUser, role:e.target.value})}>
-                <option value="student">student</option>
-                <option value="tutor">tutor</option>
-              </select>
+                      <span>{s.time}</span>
 
-              <button onClick={createUser}>Create</button>
+                      <a href={s.meetLink} target="_blank">Join</a>
 
-              <h3>Create Course</h3>
-              <input onChange={(e)=>setCourse(e.target.value)} />
-              <button onClick={createCourse}>Create Course</button>
+                      <span>{s.student}</span>
 
-              <hr />
-
-              <h3>📊 Admin Dashboard</h3>
-              <button onClick={loadAdminStats}>Load Stats</button>
-
-              {adminStats && (
-                <>
-                  <p><b>Total Users:</b> {adminStats.totalUsers}</p>
-                  <p><b>Total Classes:</b> {adminStats.totalSessions}</p>
-
-                  <h4>Users</h4>
-                  <ul>
-                    {adminStats.users.map((u,i)=>(
-                      <li key={i}>{u.username} - {u.role}</li>
-                    ))}
-                  </ul>
-                </>
-              )}
-            </>
-          )}
-
-          <br /><br />
-          <button onClick={()=>{
-            localStorage.removeItem("token");
-            setIsLoggedIn(false);
-            setRole("");
-          }}>
-            Logout
-          </button>
-        </>
-      ) : (
-        <p>Loading...</p>
-      )}
+                      {role === "tutor" ? (
+                        <button onClick={()=>reschedule(s._id)}>
+                          Reschedule
+                        </button>
+                      ) : (
+                        <span>-</span>
+                      )}
+                    </div>
+                  ))}
+              </div>
+            ))}
+          </>
+        )}
+      </div>
     </div>
   );
 }

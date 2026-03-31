@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import Calendar from "react-calendar";
 import "react-calendar/dist/Calendar.css";
 
@@ -47,40 +47,37 @@ function App() {
   };
 
   // 📊 LOAD ROLE
-  const loadDashboard = async () => {
+  const loadDashboard = useCallback(async () => {
     const res = await fetch(`${BASE}/dashboard`, {
       headers: { Authorization: getToken() }
     });
 
     if (!res.ok) return;
-
     const data = await res.json();
     setRole(data.role);
-  };
+  }, []);
 
   // 📚 LOAD SESSIONS
-  const loadSessions = async () => {
+  const loadSessions = useCallback(async () => {
     const res = await fetch(`${BASE}/sessions`, {
       headers: { Authorization: getToken() }
     });
 
     if (!res.ok) return;
-
     const data = await res.json();
     setSessions(data);
-  };
+  }, []);
 
   // 👨‍🎓 LOAD STUDENTS
-  const loadStudents = async () => {
+  const loadStudents = useCallback(async () => {
     const res = await fetch(`${BASE}/users`, {
       headers: { Authorization: getToken() }
     });
 
     if (!res.ok) return;
-
     const data = await res.json();
     setStudents(data);
-  };
+  }, []);
 
   // 🧑‍🏫 CREATE SESSION
   const createSession = async () => {
@@ -161,14 +158,14 @@ function App() {
     alert("Course created");
   };
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-useEffect(() => {
-  if (isLoggedIn) {
-    loadDashboard();
-    loadSessions();
-    loadStudents();
-  }
-}, [isLoggedIn]);
+  // 🚀 LOAD AFTER LOGIN
+  useEffect(() => {
+    if (isLoggedIn) {
+      loadDashboard();
+      loadSessions();
+      loadStudents();
+    }
+  }, [isLoggedIn, loadDashboard, loadSessions, loadStudents]);
 
   return (
     <div style={{ padding: 30 }}>
@@ -185,7 +182,7 @@ useEffect(() => {
         <>
           <h2>{role}</h2>
 
-          {/* 👨‍🎓 STUDENT */}
+          {/* STUDENT */}
           {role === "student" && (
             <>
               <Calendar onChange={setDate} value={date} />
@@ -205,7 +202,7 @@ useEffect(() => {
             </>
           )}
 
-          {/* 👨‍🏫 TUTOR */}
+          {/* TUTOR */}
           {role === "tutor" && (
             <>
               <input placeholder="Session Title" onChange={(e)=>setTitle(e.target.value)} />
@@ -237,7 +234,7 @@ useEffect(() => {
             </>
           )}
 
-          {/* 👨‍💼 ADMIN */}
+          {/* ADMIN */}
           {role === "admin" && (
             <>
               <h3>Create User</h3>

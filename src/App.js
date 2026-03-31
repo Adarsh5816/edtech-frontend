@@ -1,249 +1,236 @@
 import { useState, useEffect } from "react";
 import Calendar from "react-calendar";
-import "react-calendar/dist/Calendar.css";
 
 function App() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
-  const [message, setMessage] = useState("");
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [role, setRole] = useState("");
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
 
-  const [courseTitle, setCourseTitle] = useState("");
-  const [sessionTitle, setSessionTitle] = useState("");
-
-  const [courses, setCourses] = useState([]);
   const [sessions, setSessions] = useState([]);
+  const [students, setStudents] = useState([]);
+
+  const [title, setTitle] = useState("");
   const [date, setDate] = useState(new Date());
+  const [time, setTime] = useState("");
+  const [student, setStudent] = useState("");
 
-  const [adminData, setAdminData] = useState({});
+  const [course, setCourse] = useState("");
+  const [newUser, setNewUser] = useState({
+    username: "",
+    password: "",
+    role: "student"
+  });
 
-  // Login
-  const handleLogin = async () => {
-    const res = await fetch("https://edtech-backend-r5yc.onrender.com/login", {
+  const BASE = "https://edtech-backend-r5yc.onrender.com";
+
+  const getToken = () => localStorage.getItem("token");
+
+  // LOGIN
+  const login = async () => {
+    const res = await fetch(`${BASE}/login`, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
+      headers: {"Content-Type":"application/json"},
       body: JSON.stringify({ username, password })
     });
 
     const data = await res.json();
 
-    if (res.ok) {
+    if (data.token) {
       localStorage.setItem("token", data.token);
       setIsLoggedIn(true);
     } else {
-      setMessage("Login failed ❌");
+      alert("Login failed");
     }
   };
 
-  // Get Role
-  const getDashboard = async () => {
-    const token = localStorage.getItem("token");
-
-    const res = await fetch("https://edtech-backend-r5yc.onrender.com/dashboard", {
-      headers: { Authorization: token }
+  // LOAD ROLE
+  const loadDashboard = async () => {
+    const res = await fetch(`${BASE}/dashboard`, {
+      headers: { Authorization: getToken() }
     });
 
     const data = await res.json();
-    setRole(data.message.split(" ")[1]);
+    setRole(data.role);
   };
 
-  // Courses
-  const createCourse = async () => {
-    const token = localStorage.getItem("token");
-
-    await fetch("https://edtech-backend-r5yc.onrender.com", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: token
-      },
-      body: JSON.stringify({ title: courseTitle })
+  // LOAD SESSIONS
+  const loadSessions = async () => {
+    const res = await fetch(`${BASE}/sessions`, {
+      headers: { Authorization: getToken() }
     });
 
-    alert("Course created!");
-    setCourseTitle("");
-  };
-
-  const getCourses = async () => {
-    const token = localStorage.getItem("token");
-
-    const res = await fetch("https://edtech-backend-r5yc.onrender.com/courses", {
-      headers: { Authorization: token }
-    });
-
-    const data = await res.json();
-    setCourses(data);
-  };
-
-  // Sessions
-  const createSession = async () => {
-    const token = localStorage.getItem("token");
-
-    await fetch("https://edtech-backend-r5yc.onrender.com/session", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: token
-      },
-      body: JSON.stringify({ title: sessionTitle, date })
-    });
-
-    alert("Session created!");
-    setSessionTitle("");
-  };
-
-  const getSessions = async () => {
-    const token = localStorage.getItem("token");
-
-    const res = await fetch("https://edtech-backend-r5yc.onrender.com/sessions", {
-      headers: { Authorization: token }
-    });
+    if (!res.ok) return;
 
     const data = await res.json();
     setSessions(data);
   };
 
-  // Admin
-  const loadAdmin = async () => {
-    const token = localStorage.getItem("token");
+  // LOAD STUDENTS
+  const loadStudents = async () => {
+    const res = await fetch(`${BASE}/users`, {
+      headers: { Authorization: getToken() }
+    });
 
-    const res = await fetch("https://edtech-backend-r5yc.onrender.com/admin", {
-      headers: { Authorization: token }
+    if (!res.ok) {
+      console.log(await res.text());
+      return;
+    }
+
+    const data = await res.json();
+    setStudents(data);
+  };
+
+  // CREATE SESSION
+  const createSession = async () => {
+    const res = await fetch(`${BASE}/session`, {
+      method: "POST",
+      headers: {
+        "Content-Type":"application/json",
+        Authorization: getToken()
+      },
+      body: JSON.stringify({ title, date, time, student })
     });
 
     const data = await res.json();
-    setAdminData(data);
+
+    alert(`Link: ${data?.meetLink}`);
+    loadSessions();
   };
 
-  // Auto load sessions
+  // UPDATE SESSION
+  const updateSession = async (id) => {
+    await fetch(`${BASE}/session/${id}`, {
+      method: "PUT",
+      headers: {
+        "Content-Type":"application/json",
+        Authorization: getToken()
+      },
+      body: JSON.stringify({ date, time })
+    });
+
+    alert("Updated");
+    loadSessions();
+  };
+
+  // ADMIN CREATE USER
+  const createUser = async () => {
+    await fetch(`${BASE}/user`, {
+      method:"POST",
+      headers:{
+        "Content-Type":"application/json",
+        Authorization:getToken()
+      },
+      body:JSON.stringify(newUser)
+    });
+
+    alert("User Created");
+  };
+
+  // ADMIN CREATE COURSE
+  const createCourse = async () => {
+    await fetch(`${BASE}/course`, {
+      method:"POST",
+      headers:{
+        "Content-Type":"application/json",
+        Authorization:getToken()
+      },
+      body:JSON.stringify({ title: course })
+    });
+
+    alert("Course Created");
+  };
+
   useEffect(() => {
     if (isLoggedIn) {
-      getSessions();
+      loadDashboard();
+      loadSessions();
+      loadStudents();
     }
   }, [isLoggedIn]);
 
   return (
-    <div style={{ padding: "50px" }}>
+    <div style={{ padding: 30 }}>
       {!isLoggedIn ? (
         <>
-          <h2>Login</h2>
-
-          <input
-            placeholder="Username"
-            onChange={(e) => setUsername(e.target.value)}
-          />
-          <br /><br />
-
-          <input
-            type="password"
-            placeholder="Password"
-            onChange={(e) => setPassword(e.target.value)}
-          />
-          <br /><br />
-
-          <button onClick={handleLogin}>Login</button>
-          <p>{message}</p>
+          <input placeholder="username" onChange={(e)=>setUsername(e.target.value)} />
+          <input type="password" onChange={(e)=>setPassword(e.target.value)} />
+          <button onClick={login}>Login</button>
         </>
-      ) : (
+      ) : role ? (
         <>
-          <h2>Dashboard</h2>
-          <button onClick={getDashboard}>Load Dashboard</button>
+          <h2>{role}</h2>
 
           {/* STUDENT */}
           {role === "student" && (
             <>
-              <h3>Courses</h3>
-              <button onClick={getCourses}>Load Courses</button>
+              <Calendar onChange={setDate} value={date} />
 
-              <ul>
-                {courses.map((c, i) => (
-                  <li key={i}>{c.title}</li>
+              {sessions
+                .filter(s => new Date(s.date).toDateString() === date.toDateString())
+                .map((s,i)=>(
+                  <div key={i}>
+                    <b>{s.title}</b><br/>
+                    👨‍🏫 {s.tutor}<br/>
+                    ⏰ {s.time}<br/>
+                    <a href={s.meetLink} target="_blank" rel="noreferrer">
+                      👉 Join Class
+                    </a>
+                  </div>
                 ))}
-              </ul>
-
-              <h3>Calendar</h3>
-
-              <Calendar
-                onChange={setDate}
-                value={date}
-                tileClassName={({ date }) => {
-                  const hasSession = sessions.find(
-                    (s) =>
-                      new Date(s.date).toDateString() ===
-                      date.toDateString()
-                  );
-                  return hasSession ? "highlight" : null;
-                }}
-              />
-
-              <h4>Sessions on selected date</h4>
-
-              <ul>
-                {sessions
-                  .filter(
-                    (s) =>
-                      new Date(s.date).toDateString() ===
-                      date.toDateString()
-                  )
-                  .map((s, i) => (
-                    <li key={i}>{s.title}</li>
-                  ))}
-              </ul>
             </>
           )}
 
           {/* TUTOR */}
           {role === "tutor" && (
             <>
-              <h3>Create Course</h3>
-              <input
-                placeholder="Course title"
-                value={courseTitle}
-                onChange={(e) => setCourseTitle(e.target.value)}
-              />
-              <button onClick={createCourse}>Add Course</button>
-
-              <h3>Schedule Session</h3>
-
-              <input
-                placeholder="Session title"
-                value={sessionTitle}
-                onChange={(e) => setSessionTitle(e.target.value)}
-              />
-
+              <input placeholder="Title" onChange={(e)=>setTitle(e.target.value)} />
               <Calendar onChange={setDate} value={date} />
+              <input type="time" onChange={(e)=>setTime(e.target.value)} />
 
-              <button onClick={createSession}>Create Session</button>
+              <select onChange={(e)=>setStudent(e.target.value)}>
+                <option>Select student</option>
+                {students.map((s,i)=>(
+                  <option key={i} value={s.username}>
+                    {s.username}
+                  </option>
+                ))}
+              </select>
+
+              <button onClick={createSession}>Create</button>
+
+              <h3>Reschedule</h3>
+              {sessions.map(s=>(
+                <div key={s._id}>
+                  {s.title} - {s.time}
+                  <button onClick={()=>updateSession(s._id)}>Update</button>
+                </div>
+              ))}
             </>
           )}
 
           {/* ADMIN */}
           {role === "admin" && (
             <>
-              <h3>Admin Dashboard</h3>
-              <button onClick={loadAdmin}>Load Data</button>
+              <h3>Create User</h3>
+              <input placeholder="username"
+                onChange={(e)=>setNewUser({...newUser,username:e.target.value})}/>
+              <input placeholder="password"
+                onChange={(e)=>setNewUser({...newUser,password:e.target.value})}/>
+              <select onChange={(e)=>setNewUser({...newUser,role:e.target.value})}>
+                <option value="student">student</option>
+                <option value="tutor">tutor</option>
+              </select>
+              <button onClick={createUser}>Create</button>
 
-              <pre>{JSON.stringify(adminData, null, 2)}</pre>
+              <h3>Create Course</h3>
+              <input onChange={(e)=>setCourse(e.target.value)} />
+              <button onClick={createCourse}>Create Course</button>
             </>
           )}
-
-          <br /><br />
-
-          <button
-            onClick={() => {
-              localStorage.removeItem("token");
-              setIsLoggedIn(false);
-              setRole("");
-              setCourses([]);
-              setSessions([]);
-            }}
-          >
-            Logout
-          </button>
         </>
+      ) : (
+        <p>Loading...</p>
       )}
     </div>
   );

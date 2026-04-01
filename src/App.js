@@ -23,41 +23,51 @@ function App() {
 
   // ================= LOGIN =================
   const login = async () => {
-    setLoading(true);
+  setLoading(true);
 
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 10000);
+
+    const res = await fetch(`${BASE}/login`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ username, password }),
+      signal: controller.signal
+    });
+
+    clearTimeout(timeout);
+
+    const text = await res.text();
+
+    let data;
     try {
-      const res = await fetch(`${BASE}/login`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username, password })
-      });
-
-      const text = await res.text();
-
-      let data;
-      try {
-        data = JSON.parse(text);
-      } catch {
-        alert("Server waking up... try again in 5 sec");
-        setLoading(false);
-        return;
-      }
-
-      if (!res.ok) {
-        alert(data.error || "Login failed");
-        setLoading(false);
-        return;
-      }
-
-      localStorage.setItem("token", data.token);
-      setIsLoggedIn(true);
-
+      data = JSON.parse(text);
     } catch {
-      alert("Network error");
+      alert("Server waking up... try again");
+      setLoading(false);
+      return;
     }
 
-    setLoading(false);
-  };
+    if (!res.ok) {
+      alert(data.error || "Login failed");
+      setLoading(false);
+      return;
+    }
+
+    localStorage.setItem("token", data.token);
+    setIsLoggedIn(true);
+
+  } catch (err) {
+    if (err.name === "AbortError") {
+      alert("Server timeout. Try again.");
+    } else {
+      alert("Backend not reachable");
+    }
+  }
+
+  setLoading(false);
+};
 
   // ================= LOAD DATA =================
   const loadData = useCallback(async () => {

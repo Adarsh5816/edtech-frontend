@@ -19,55 +19,74 @@ function App() {
 
   const getToken = () => localStorage.getItem("token");
 
-  // LOGIN
+  // ================= LOGIN =================
   const login = async () => {
+  try {
     const res = await fetch(`${BASE}/login`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ username, password })
     });
 
-    const data = await res.json();
+    const text = await res.text();
 
-    if (data.token) {
-      localStorage.setItem("token", data.token);
-      setIsLoggedIn(true);
-    } else {
-      alert("Login failed");
+    let data;
+    try {
+      data = JSON.parse(text);
+    } catch {
+      alert("Backend not updated yet");
+      return;
     }
-  };
 
-  // LOAD DATA (FIXED with useCallback)
+    if (!res.ok) {
+      alert(data.error || "Login failed");
+      return;
+    }
+
+    localStorage.setItem("token", data.token);
+    setIsLoggedIn(true);
+
+  } catch {
+    alert("Network error");
+  }
+};
+
+  // ================= LOAD DATA =================
   const loadData = useCallback(async () => {
     const token = getToken();
 
-    const dash = await fetch(`${BASE}/dashboard`, {
-      headers: { Authorization: token }
-    });
-    const d = await dash.json();
-    setRole(d.role);
-
-    const s = await fetch(`${BASE}/sessions`, {
-      headers: { Authorization: token }
-    });
-    setSessions(await s.json());
-
-    if (d.role === "admin") {
-      const u = await fetch(`${BASE}/users`, {
+    try {
+      const dash = await fetch(`${BASE}/dashboard`, {
         headers: { Authorization: token }
       });
-      setUsers(await u.json());
+
+      const d = await dash.json();
+      setRole(d.role);
+
+      const s = await fetch(`${BASE}/sessions`, {
+        headers: { Authorization: token }
+      });
+
+      setSessions(await s.json());
+
+      if (d.role === "admin") {
+        const u = await fetch(`${BASE}/users`, {
+          headers: { Authorization: token }
+        });
+
+        setUsers(await u.json());
+      }
+
+    } catch (err) {
+      console.log("LOAD ERROR", err);
     }
   }, []);
 
-  // FIXED DEPENDENCY ISSUE
   useEffect(() => {
-    if (isLoggedIn) {
-      loadData();
-    }
+    if (isLoggedIn) loadData();
   }, [isLoggedIn, loadData]);
 
-  // CREATE USER
+  // ================= CREATE USER =================
   const createUser = async () => {
     await fetch(`${BASE}/user`, {
       method: "POST",
@@ -82,7 +101,7 @@ function App() {
     loadData();
   };
 
-  // RESCHEDULE
+  // ================= RESCHEDULE =================
   const reschedule = async (id) => {
     const time = prompt("Enter new time");
     if (!time) return;
@@ -99,59 +118,36 @@ function App() {
     loadData();
   };
 
-  const days = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday"];
+  const days = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
 
   return (
     <div className="flex h-screen">
 
-      {/* SIDEBAR */}
-      <div className="w-60 bg-indigo-600 text-white p-4">
-        <h2 className="text-xl font-bold mb-4">EdTech</h2>
-        <p>{role}</p>
-
-        <button
-          className="mt-4 bg-red-500 p-2 w-full rounded"
-          onClick={() => {
-            localStorage.removeItem("token");
-            setIsLoggedIn(false);
-          }}
-        >
-          Logout
-        </button>
-      </div>
-
-      {/* MAIN */}
-      <div className="flex-1 p-6 bg-gray-100 overflow-auto">
-
-        {!isLoggedIn ? (
-          <div className="bg-white p-6 w-80 mx-auto rounded shadow">
-            <h2 className="text-xl mb-4">Login</h2>
-
-            <input
-              className="border p-2 w-full mb-2"
-              placeholder="username"
-              onChange={(e) => setUsername(e.target.value)}
-            />
-
-            <input
-              className="border p-2 w-full mb-2"
-              placeholder="password"
-              onChange={(e) => setPassword(e.target.value)}
-            />
+      {isLoggedIn ? (
+        <>
+          {/* SIDEBAR */}
+          <div className="w-60 bg-indigo-600 text-white p-4">
+            <h2 className="text-xl font-bold mb-4">EdTech</h2>
+            <p className="capitalize">{role}</p>
 
             <button
-              className="bg-indigo-600 text-white w-full p-2"
-              onClick={login}
+              className="mt-4 bg-red-500 p-2 w-full rounded"
+              onClick={() => {
+                localStorage.removeItem("token");
+                setIsLoggedIn(false);
+              }}
             >
-              Login
+              Logout
             </button>
           </div>
-        ) : (
-          <>
-            {/* ADMIN */}
+
+          {/* MAIN */}
+          <div className="flex-1 p-6 bg-gray-100 overflow-auto">
+
+            {/* ADMIN PANEL */}
             {role === "admin" && (
               <div className="bg-white p-4 rounded shadow mb-4">
-                <h3>Create User</h3>
+                <h3 className="font-bold mb-2">Create User</h3>
 
                 <input
                   className="border p-2 m-1"
@@ -164,6 +160,7 @@ function App() {
                 <input
                   className="border p-2 m-1"
                   placeholder="password"
+                  type="password"
                   onChange={(e) =>
                     setNewUser({ ...newUser, password: e.target.value })
                   }
@@ -173,9 +170,10 @@ function App() {
                   onChange={(e) =>
                     setNewUser({ ...newUser, role: e.target.value })
                   }
+                  className="border p-2 m-1"
                 >
-                  <option>student</option>
-                  <option>tutor</option>
+                  <option value="student">student</option>
+                  <option value="tutor">tutor</option>
                 </select>
 
                 <button
@@ -185,8 +183,8 @@ function App() {
                   Create
                 </button>
 
-                <h3 className="mt-4">Users</h3>
-                {users.map((u) => (
+                <h3 className="mt-4 font-bold">Users</h3>
+                {users.map(u => (
                   <div key={u._id}>
                     {u.username} - {u.role}
                   </div>
@@ -195,7 +193,7 @@ function App() {
             )}
 
             {/* WEEK VIEW */}
-            {days.map((day) => (
+            {days.map(day => (
               <div key={day} className="bg-white p-4 rounded shadow mb-4">
                 <h2 className="text-green-600 text-xl">{day}</h2>
 
@@ -208,21 +206,20 @@ function App() {
 
                 {sessions
                   .filter(
-                    (s) =>
+                    s =>
                       new Date(s.date).toLocaleString("en-US", {
                         weekday: "long"
                       }) === day
                   )
-                  .map((s) => (
+                  .map(s => (
                     <div key={s._id} className="grid grid-cols-4 mt-2">
-
                       <span>{s.time}</span>
 
-                      {/* FIXED security warning */}
                       <a
                         href={s.meetLink}
                         target="_blank"
                         rel="noreferrer"
+                        className="text-blue-500"
                       >
                         Join
                       </a>
@@ -230,7 +227,10 @@ function App() {
                       <span>{s.student}</span>
 
                       {role === "tutor" ? (
-                        <button onClick={() => reschedule(s._id)}>
+                        <button
+                          onClick={() => reschedule(s._id)}
+                          className="text-indigo-600"
+                        >
                           Reschedule
                         </button>
                       ) : (
@@ -240,9 +240,35 @@ function App() {
                   ))}
               </div>
             ))}
-          </>
-        )}
-      </div>
+          </div>
+        </>
+      ) : (
+        <div className="flex items-center justify-center w-full bg-gray-100">
+          <div className="bg-white p-6 w-80 rounded shadow">
+            <h2 className="text-xl mb-4">Login</h2>
+
+            <input
+              className="border p-2 w-full mb-2"
+              placeholder="username"
+              onChange={(e) => setUsername(e.target.value)}
+            />
+
+            <input
+              className="border p-2 w-full mb-2"
+              placeholder="password"
+              type="password"
+              onChange={(e) => setPassword(e.target.value)}
+            />
+
+            <button
+              className="bg-indigo-600 text-white w-full p-2"
+              onClick={login}
+            >
+              Login
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
